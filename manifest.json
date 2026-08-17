@@ -1,0 +1,15 @@
+{
+  "name": "Ignis Expenses",
+  "short_name": "Ignis",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3204/3204005.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
