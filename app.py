@@ -16,6 +16,11 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# ---> ADDED THIS ROUTE TO FIX RENDER 404 LOGS <---
+@app.route('/')
+def health_check():
+    return jsonify({"status": "API is running successfully"}), 200
+
 # Helper function to verify the user token
 def get_user_from_token(req):
     auth_header = req.headers.get('Authorization')
