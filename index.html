@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python + HTML Full Stack App</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 400px; margin: auto; }
+        input, button { padding: 10px; width: 100%; margin-bottom: 10px; box-sizing: border-box; }
+        #responseBox { margin-top: 20px; padding: 15px; background: #eef2f5; border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+    <h2>Say Hello to Python! 🐍</h2>
+    
+    <input type="text" id="nameInput" placeholder="Enter your name">
+    <button onclick="sendToBackend()">Submit</button>
+
+    <div id="responseBox">
+        <p><strong>Python says:</strong> <span id="msgOutput">Waiting for input...</span></p>
+        <p><strong>Visitor Log:</strong> <span id="visitorsOutput">None yet</span></p>
+    </div>
+
+    <script>
+        async function sendToBackend() {
+            const nameInput = document.getElementById('nameInput').value;
+            
+            if (!nameInput) {
+                alert("Please enter a name!");
+                return;
+            }
+
+            try {
+                // Send a POST request to the Python backend running on localhost
+                const response = await fetch('http://127.0.0.1:5000/api/greet', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: nameInput })
+                });
+
+                // Get the JSON response back from Python
+                const data = await response.json();
+                
+                // Update the HTML with the new data
+                document.getElementById('msgOutput').innerText = data.message;
+                document.getElementById('visitorsOutput').innerText = data.visitors.join(', ');
+                
+                // Clear the input field
+                document.getElementById('nameInput').value = '';
+
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('msgOutput').innerText = "Error: Could not connect to Python backend. Is it running?";
+            }
+        }
+    </script>
+</body>
+</html>
