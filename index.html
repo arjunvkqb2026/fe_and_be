@@ -104,6 +104,39 @@
             </div>
         </div>
 
+        <!-- CREDIT CARD STATEMENT CYCLE & UTILIZATION WIDGET (21st to 20th Cycle) -->
+        <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-3xl border border-indigo-900/60 shadow-xl space-y-3">
+            <div class="flex flex-wrap justify-between items-center gap-2">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-10 h-10 rounded-2xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-400 font-bold">
+                        <i class="fa-solid fa-credit-card text-lg"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-black uppercase tracking-wider text-indigo-300">Credit Card Statement Cycle</h4>
+                        <p class="text-xs text-slate-300 font-medium" id="cc-cycle-period">Cycle: 21st to 20th</p>
+                    </div>
+                </div>
+                <div id="cc-billing-badge" class="px-3 py-1 rounded-xl text-xs font-black bg-indigo-500/20 border border-indigo-400/30 text-indigo-300">
+                    Cycle Active
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                <div class="bg-white/5 p-3 rounded-2xl border border-white/10">
+                    <p class="text-[10px] uppercase font-bold text-slate-400">Current Cycle Debt</p>
+                    <p class="text-lg font-black text-rose-400" id="cc-current-bill">₹0</p>
+                </div>
+                <div class="bg-white/5 p-3 rounded-2xl border border-white/10">
+                    <p class="text-[10px] uppercase font-bold text-slate-400">Statement Cut-Off</p>
+                    <p class="text-sm font-bold text-slate-200" id="cc-cutoff-date">20th of Month</p>
+                </div>
+                <div class="bg-white/5 p-3 rounded-2xl border border-white/10">
+                    <p class="text-[10px] uppercase font-bold text-slate-400">Credit Deficit Alert</p>
+                    <p class="text-sm font-bold text-amber-300" id="cc-deficit-status">No Cash Deficit</p>
+                </div>
+            </div>
+        </div>
+
         <!-- FILTER CONTROLS -->
         <div class="flex justify-between items-center bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800">
             <span class="text-xs font-bold text-slate-400 uppercase">Dashboard Scope</span>
@@ -793,6 +826,45 @@
         document.getElementById('stat-fixed').innerText = `₹${totalFixedTemplates.toLocaleString()}`;
         document.getElementById('stat-variable').innerText = `₹${totalSpent.toLocaleString()}`;
         document.getElementById('balance-display').innerText = `₹${remainingBalance.toLocaleString()}`;
+
+        // Compute Credit Card 21st-to-20th Statement Cycle Debt
+        // Determine active statement cycle bounds (from 21st of prev month to 20th of current/next month)
+        let cycleStart = new Date(now.getFullYear(), now.getMonth(), 21);
+        let cycleEnd = new Date(now.getFullYear(), now.getMonth() + 1, 20, 23, 59, 59);
+
+        if (now.getDate() <= 20) {
+            cycleStart = new Date(now.getFullYear(), now.getMonth() - 1, 21);
+            cycleEnd = new Date(now.getFullYear(), now.getMonth(), 20, 23, 59, 59);
+        }
+
+        const currentCycleExpenses = expList.filter(item => {
+            if (!item || !item.date) return false;
+            const d = new Date(item.date);
+            return d >= cycleStart && d <= cycleEnd;
+        });
+
+        const currentCycleDebt = currentCycleExpenses.reduce((acc, cur) => acc + (parseFloat(cur.cost) || 0), 0);
+
+        const cyclePeriodEl = document.getElementById('cc-cycle-period');
+        if (cyclePeriodEl) {
+            const startStr = cycleStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const endStr = cycleEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            cyclePeriodEl.innerText = `Cycle: ${startStr} – ${endStr}`;
+        }
+
+        const ccBillEl = document.getElementById('cc-current-bill');
+        if (ccBillEl) ccBillEl.innerText = `₹${currentCycleDebt.toLocaleString()}`;
+
+        const deficitEl = document.getElementById('cc-deficit-status');
+        if (deficitEl) {
+            if (remainingBalance < 0) {
+                deficitEl.innerText = `⚠️ Deficit: ₹${Math.abs(remainingBalance).toLocaleString()} on CC`;
+                deficitEl.className = "text-sm font-bold text-red-400";
+            } else {
+                deficitEl.innerText = "No Cash Deficit";
+                deficitEl.className = "text-sm font-bold text-emerald-400";
+            }
+        }
 
         // Compute Savings Rate & Health Badge
         const savedAmount = Math.max(0, numSalary - totalSpent);
