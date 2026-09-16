@@ -610,7 +610,7 @@
         closeTemplateModal();
     }
 
-    async function quickLog(name, amount, category) {
+    async function quickLog(name, amount, category, templateId = null) {
         const userId = currentSession.user.id;
         const payload = {
             user_id: userId,
@@ -631,10 +631,22 @@
                 body: JSON.stringify(payload)
             });
         }
+
+        if (templateId) {
+            const now = new Date();
+            const paidStateKey = `paid_templates_${now.getFullYear()}_${now.getMonth()}`;
+            let paidState = {};
+            try {
+                paidState = JSON.parse(localStorage.getItem(paidStateKey) || '{}');
+            } catch(e) { paidState = {}; }
+            paidState[templateId] = true;
+            localStorage.setItem(paidStateKey, JSON.stringify(paidState));
+        }
+
         await loadInitialData();
     }
 
-    async function toggleTemplatePaid(id, isChecked) {
+    async function toggleTemplatePaid(id, isChecked, name = '', amount = 0, category = 'Bills') {
         const now = new Date();
         const paidStateKey = `paid_templates_${now.getFullYear()}_${now.getMonth()}`;
         let paidState = {};
@@ -644,7 +656,13 @@
 
         paidState[id] = isChecked;
         localStorage.setItem(paidStateKey, JSON.stringify(paidState));
-        updateUI();
+
+        // Single click: If checking the box and expense details provided, log expense automatically
+        if (isChecked && amount > 0) {
+            await quickLog(name, amount, category, id);
+        } else {
+            updateUI();
+        }
     }
 
     async function deleteEMI(id) {
@@ -881,11 +899,15 @@
 
             recEl.innerHTML = recList.map(item => {
                 const isPaid = !!paidState[item.id];
+                const safeName = (item.name || '').replace(/'/g, "\\'");
+                const itemAmt = parseFloat(item.amount) || 0;
+                const safeCat = item.category || 'Bills';
+
                 return `
                 <div class="flex justify-between items-center p-3.5 rounded-2xl border transition-all ${isPaid ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50' : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700/50'}">
                     <div class="flex items-center gap-3">
-                        <input type="checkbox" onchange="toggleTemplatePaid('${item.id}', this.checked)" ${isPaid ? 'checked' : ''} 
-                            class="w-5 h-5 rounded-md text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600 transition-all" title="Mark as Paid/Given">
+                        <input type="checkbox" onchange="toggleTemplatePaid('${item.id}', this.checked, '${safeName}', ${itemAmt}, '${safeCat}')" ${isPaid ? 'checked' : ''} 
+                            class="w-5 h-5 rounded-md text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600 transition-all" title="Click to Add Expense & Check Box">
                         <div>
                             <span class="font-bold text-sm ${isPaid ? 'line-through text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-slate-100'}">${item.name}</span>
                             <div class="flex items-center gap-2">
@@ -895,8 +917,8 @@
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
-                        <span class="font-black text-slate-700 dark:text-slate-200 mr-2 text-sm">₹${(parseFloat(item.amount) || 0).toLocaleString()}</span>
-                        <button onclick="quickLog('${(item.name || '').replace(/'/g, "\\'")}', ${parseFloat(item.amount) || 0}, '${item.category || 'Bills'}')" class="theme-btn text-xs font-bold text-white px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-sm transition-all" title="Log into Expense History">
+                        <span class="font-black text-slate-700 dark:text-slate-200 mr-2 text-sm">₹${itemAmt.toLocaleString()}</span>
+                        <button onclick="quickLog('${safeName}', ${itemAmt}, '${safeCat}', '${item.id}')" class="theme-btn text-xs font-bold text-white px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-sm transition-all" title="Single-click: Add expense & check box">
                             <i class="fa-solid fa-bolt text-amber-300"></i> Log
                         </button>
                         <button onclick="openTemplateModal('${item.id}')" class="text-xs text-blue-500 hover:text-blue-600 font-bold p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30" title="Edit Template">
