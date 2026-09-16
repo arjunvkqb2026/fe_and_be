@@ -50,18 +50,23 @@
         
         <!-- TOP METRICS DASHBOARD -->
         <div class="bg-gradient-to-br from-emerald-600 to-teal-700 p-6 rounded-3xl text-white shadow-xl">
-            <div class="flex justify-between items-start">
+            <div class="flex flex-wrap justify-between items-start gap-4">
                 <div>
                     <p class="text-xs font-bold uppercase opacity-80">Remaining Balance</p>
                     <h2 class="text-4xl font-black mt-1" id="balance-display">₹0</h2>
                 </div>
-                <button onclick="updateSalaryPrompt()" class="bg-white/20 px-3 py-1.5 rounded-xl text-xs font-bold backdrop-blur-md">
-                    <i class="fa-solid fa-pen"></i> Set In-Hand
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="openIncomeModal('add')" class="bg-amber-400 hover:bg-amber-500 text-slate-900 px-3.5 py-2 rounded-xl text-xs font-black shadow-md transition-all flex items-center gap-1.5 active:scale-95">
+                        <i class="fa-solid fa-plus"></i> Add Money
+                    </button>
+                    <button onclick="openIncomeModal('set')" class="bg-white/20 hover:bg-white/30 px-3.5 py-2 rounded-xl text-xs font-bold backdrop-blur-md transition-all flex items-center gap-1.5 active:scale-95">
+                        <i class="fa-solid fa-pen"></i> Set Total
+                    </button>
+                </div>
             </div>
             <div class="grid grid-cols-3 gap-2 mt-6">
                 <div class="bg-white/10 p-3 rounded-2xl backdrop-blur-md">
-                    <p class="text-[9px] uppercase font-bold opacity-70">In-Hand Salary</p>
+                    <p class="text-[9px] uppercase font-bold opacity-70">Total In-Hand</p>
                     <p class="text-sm font-bold" id="stat-salary">₹0</p>
                 </div>
                 <div class="bg-white/10 p-3 rounded-2xl backdrop-blur-md">
@@ -147,6 +152,42 @@
 
     </div>
 </main>
+
+<!-- IN-HAND BALANCE / INCOME MODAL -->
+<div id="income-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white dark:bg-slate-900 w-full max-w-md p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+        <div class="flex justify-between items-center border-b dark:border-slate-800 pb-3">
+            <h3 class="font-black text-lg text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <i class="fa-solid fa-coins text-amber-500"></i> Manage In-Hand Balance
+            </h3>
+            <button onclick="closeIncomeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+
+        <!-- TAB BUTTONS -->
+        <div class="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 font-bold text-xs">
+            <button type="button" id="tab-add-inc" onclick="switchIncomeTab('add')" class="flex-1 py-2 rounded-lg bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm font-bold">+ Add Money (Append)</button>
+            <button type="button" id="tab-set-inc" onclick="switchIncomeTab('set')" class="flex-1 py-2 rounded-lg text-slate-500 dark:text-slate-400 font-bold">Set Total In-Hand</button>
+        </div>
+
+        <form id="income-form" class="space-y-4" onsubmit="handleIncomeSubmit(event)">
+            <input type="hidden" id="inc-mode" value="add">
+            
+            <div id="inc-add-desc" class="text-xs text-slate-500 dark:text-slate-400 bg-emerald-50 dark:bg-emerald-950/30 p-3 rounded-xl border border-emerald-100 dark:border-emerald-800">
+                Current In-Hand: <span id="current-inhand-preview" class="font-black text-emerald-600 dark:text-emerald-400">₹0</span>. Enter amount returned by friend or extra income to append to your balance.
+            </div>
+
+            <div>
+                <label id="inc-label" class="block text-xs font-bold uppercase text-slate-400 mb-1">Amount to Add (₹)</label>
+                <input type="number" id="inc-amount" placeholder="e.g., 1000" required class="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 font-bold text-sm text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeIncomeModal()" class="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold py-3 rounded-xl text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">Cancel</button>
+                <button type="submit" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl text-sm shadow-md transition-all">Update Balance</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <!-- TEMPLATE EDIT / CREATE MODAL -->
 <div id="template-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
@@ -303,26 +344,74 @@
         updateUI();
     }
 
-    async function updateSalaryPrompt() {
-        const newSal = prompt("Enter your monthly total in-hand salary (₹):", inHandSalary);
-        if (newSal !== null && newSal.trim() !== "") {
-            const parsedSal = parseFloat(newSal);
-            if (!isNaN(parsedSal)) {
-                const userId = currentSession.user.id;
-                const { error } = await supabaseClient
-                    .from('user_settings')
-                    .upsert({ user_id: userId, in_hand_salary: parsedSal }, { onConflict: 'user_id' });
-                
-                if (error && BACKEND_URL) {
-                    await fetch(`${BACKEND_URL}/profile`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
-                        body: JSON.stringify({ in_hand_salary: parsedSal })
-                    });
-                }
-                await loadInitialData();
-            }
+    function openIncomeModal(mode = 'add') {
+        const modal = document.getElementById('income-modal');
+        switchIncomeTab(mode);
+        const prevEl = document.getElementById('current-inhand-preview');
+        if (prevEl) prevEl.innerText = `₹${(parseFloat(inHandSalary) || 0).toLocaleString()}`;
+        document.getElementById('inc-amount').value = '';
+        modal.classList.remove('hidden');
+    }
+
+    function closeIncomeModal() {
+        document.getElementById('income-modal').classList.add('hidden');
+    }
+
+    function switchIncomeTab(mode) {
+        document.getElementById('inc-mode').value = mode;
+        const addTab = document.getElementById('tab-add-inc');
+        const setTab = document.getElementById('tab-set-inc');
+        const addDesc = document.getElementById('inc-add-desc');
+        const label = document.getElementById('inc-label');
+        const amountInput = document.getElementById('inc-amount');
+
+        if (mode === 'add') {
+            addTab.className = "flex-1 py-2 rounded-lg bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm font-bold";
+            setTab.className = "flex-1 py-2 rounded-lg text-slate-500 dark:text-slate-400 font-bold";
+            if (addDesc) addDesc.classList.remove('hidden');
+            if (label) label.innerText = "Amount to Add (Append) (₹)";
+            if (amountInput) amountInput.placeholder = "e.g., 1000 (money returned by friend)";
+        } else {
+            setTab.className = "flex-1 py-2 rounded-lg bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm font-bold";
+            addTab.className = "flex-1 py-2 rounded-lg text-slate-500 dark:text-slate-400 font-bold";
+            if (addDesc) addDesc.classList.add('hidden');
+            if (label) label.innerText = "Total Monthly In-Hand Salary (₹)";
+            if (amountInput) amountInput.placeholder = "e.g., 50000";
         }
+    }
+
+    async function handleIncomeSubmit(e) {
+        e.preventDefault();
+        const mode = document.getElementById('inc-mode').value;
+        const val = parseFloat(document.getElementById('inc-amount').value);
+        if (isNaN(val) || val < 0) return;
+
+        let newSalary = 0;
+        if (mode === 'add') {
+            newSalary = (parseFloat(inHandSalary) || 0) + val;
+        } else {
+            newSalary = val;
+        }
+
+        const userId = currentSession.user.id;
+        const { error } = await supabaseClient
+            .from('user_settings')
+            .upsert({ user_id: userId, in_hand_salary: newSalary }, { onConflict: 'user_id' });
+
+        if (error && BACKEND_URL) {
+            await fetch(`${BACKEND_URL}/profile`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+                body: JSON.stringify({ in_hand_salary: newSalary })
+            });
+        }
+
+        closeIncomeModal();
+        await loadInitialData();
+    }
+
+    function updateSalaryPrompt() {
+        openIncomeModal('set');
     }
 
     function openTemplateModal(id = null) {
