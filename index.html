@@ -133,11 +133,14 @@
                     <h3 class="text-sm font-black uppercase text-slate-400 flex items-center gap-2">
                         <i class="fa-solid fa-arrows-rotate theme-text text-emerald-500"></i> Monthly Expense Templates (Rent, EMIs)
                     </h3>
-                    <p class="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">Set values like Rent (₹8000) once to log them each month in 1 click.</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">Check off paid items to easily track remaining pending EMIs and Rent for the month.</p>
                 </div>
-                <button onclick="openTemplateModal()" class="theme-btn text-xs font-bold bg-emerald-600 hover:opacity-90 text-white px-3.5 py-2 rounded-xl shadow-sm transition-all flex items-center gap-1.5">
-                    <i class="fa-solid fa-plus"></i> Add Template
-                </button>
+                <div class="flex items-center gap-3">
+                    <div id="template-summary-badges"></div>
+                    <button onclick="openTemplateModal()" class="theme-btn text-xs font-bold bg-emerald-600 hover:opacity-90 text-white px-3.5 py-2 rounded-xl shadow-sm transition-all flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus"></i> Add Template
+                    </button>
+                </div>
             </div>
             <div id="recurring-list" class="space-y-2"></div>
         </div>
@@ -631,6 +634,19 @@
         await loadInitialData();
     }
 
+    async function toggleTemplatePaid(id, isChecked) {
+        const now = new Date();
+        const paidStateKey = `paid_templates_${now.getFullYear()}_${now.getMonth()}`;
+        let paidState = {};
+        try {
+            paidState = JSON.parse(localStorage.getItem(paidStateKey) || '{}');
+        } catch(e) { paidState = {}; }
+
+        paidState[id] = isChecked;
+        localStorage.setItem(paidStateKey, JSON.stringify(paidState));
+        updateUI();
+    }
+
     async function deleteEMI(id) {
         if(confirm("Delete this recurring template?")) {
             const { error } = await supabaseClient
@@ -821,18 +837,66 @@
 
         // Render Recurring List
         const recEl = document.getElementById('recurring-list');
+        const summaryBadgeEl = document.getElementById('template-summary-badges');
+
         if (recList.length === 0) {
             recEl.innerHTML = `<p class="text-xs text-slate-400 italic p-2">No templates added yet. Click "+ Add Template" above to set monthly fixed costs like Rent or EMI.</p>`;
+            if (summaryBadgeEl) summaryBadgeEl.innerHTML = '';
         } else {
-            recEl.innerHTML = recList.map(item => `
-                <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-700/50">
-                    <div>
-                        <span class="font-bold text-sm text-slate-800 dark:text-slate-100">${item.name}</span>
-                        <span class="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">${item.category || 'Bills'}</span>
+            // Read paid status state from localStorage for current month
+            const paidStateKey = `paid_templates_${now.getFullYear()}_${now.getMonth()}`;
+            let paidState = {};
+            try {
+                paidState = JSON.parse(localStorage.getItem(paidStateKey) || '{}');
+            } catch(e) { paidState = {}; }
+
+            let totalPaid = 0;
+            let totalPending = 0;
+            let countPaid = 0;
+            let countPending = 0;
+
+            recList.forEach(item => {
+                const amt = parseFloat(item.amount) || 0;
+                if (paidState[item.id]) {
+                    totalPaid += amt;
+                    countPaid++;
+                } else {
+                    totalPending += amt;
+                    countPending++;
+                }
+            });
+
+            if (summaryBadgeEl) {
+                summaryBadgeEl.innerHTML = `
+                    <div class="flex items-center gap-2 text-xs font-bold">
+                        <span class="px-2.5 py-1 rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50">
+                            <i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i> Paid (${countPaid}): ₹${totalPaid.toLocaleString()}
+                        </span>
+                        <span class="px-2.5 py-1 rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50">
+                            <i class="fa-solid fa-clock text-amber-500 mr-1"></i> Pending (${countPending}): ₹${totalPending.toLocaleString()}
+                        </span>
+                    </div>
+                `;
+            }
+
+            recEl.innerHTML = recList.map(item => {
+                const isPaid = !!paidState[item.id];
+                return `
+                <div class="flex justify-between items-center p-3.5 rounded-2xl border transition-all ${isPaid ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50' : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700/50'}">
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" onchange="toggleTemplatePaid('${item.id}', this.checked)" ${isPaid ? 'checked' : ''} 
+                            class="w-5 h-5 rounded-md text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600 transition-all" title="Mark as Paid/Given">
+                        <div>
+                            <span class="font-bold text-sm ${isPaid ? 'line-through text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-slate-100'}">${item.name}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">${item.category || 'Bills'}</span>
+                                ${isPaid ? '<span class="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/60 px-1.5 py-0.5 rounded">PAID</span>' : '<span class="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/60 px-1.5 py-0.5 rounded">PENDING</span>'}
+                            </div>
+                        </div>
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="font-black text-slate-700 dark:text-slate-200 mr-2 text-sm">₹${(parseFloat(item.amount) || 0).toLocaleString()}</span>
-                        <button onclick="quickLog('${(item.name || '').replace(/'/g, "\\'")}', ${parseFloat(item.amount) || 0}, '${item.category || 'Bills'}')" class="theme-btn text-xs font-bold text-white px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-sm transition-all" title="1-Click Log into Expenses">
+                        <button onclick="quickLog('${(item.name || '').replace(/'/g, "\\'")}', ${parseFloat(item.amount) || 0}, '${item.category || 'Bills'}')" class="theme-btn text-xs font-bold text-white px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-sm transition-all" title="Log into Expense History">
                             <i class="fa-solid fa-bolt text-amber-300"></i> Log
                         </button>
                         <button onclick="openTemplateModal('${item.id}')" class="text-xs text-blue-500 hover:text-blue-600 font-bold p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30" title="Edit Template">
@@ -843,7 +907,7 @@
                         </button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
 
         // Render Expense History
