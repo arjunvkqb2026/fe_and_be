@@ -97,18 +97,34 @@
             </div>
         </div>
 
-        <!-- RECURRING EXPENSES (EMI & RENT) MANAGEMENT -->
+        <!-- RECURRING EXPENSES (EMI & RENT) TEMPLATES MANAGEMENT -->
         <div class="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-4">
-            <div class="flex justify-between items-center">
-                <h3 class="text-sm font-black uppercase text-slate-400"><i class="fa-solid fa-arrows-rotate"></i> Fixed Monthly Expenses (EMIs, Rent)</h3>
-                <button onclick="addOrEditEMI()" class="text-xs font-bold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 px-3 py-1.5 rounded-xl">+ Add EMI/Rent</button>
+            <div class="flex flex-wrap justify-between items-center gap-2">
+                <div>
+                    <h3 class="text-sm font-black uppercase text-slate-400 flex items-center gap-2">
+                        <i class="fa-solid fa-arrows-rotate text-emerald-500"></i> Monthly Expense Templates (Rent, EMIs)
+                    </h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">Set values like Rent (₹8000) once to log them each month in 1 click.</p>
+                </div>
+                <button onclick="openTemplateModal()" class="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl shadow-sm transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-plus"></i> Add Template
+                </button>
             </div>
             <div id="recurring-list" class="space-y-2"></div>
         </div>
 
-        <!-- DAILY LOG FORM -->
+        <!-- DAILY LOG FORM & QUICK LOG TEMPLATES -->
         <div class="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-4">
-            <h3 class="text-sm font-black uppercase text-slate-400"><i class="fa-solid fa-plus"></i> Log Variable Expense</h3>
+            <h3 class="text-sm font-black uppercase text-slate-400"><i class="fa-solid fa-plus text-emerald-500"></i> Log Variable Expense</h3>
+            
+            <!-- QUICK LOG TEMPLATES CHIPS -->
+            <div id="quick-templates-container" class="hidden space-y-2 pb-2 border-b dark:border-slate-800">
+                <p class="text-[11px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                    <i class="fa-solid fa-bolt text-amber-500"></i> 1-Click Monthly Templates:
+                </p>
+                <div id="quick-templates-list" class="flex flex-wrap gap-2"></div>
+            </div>
+
             <form id="expense-form" class="grid grid-cols-1 sm:grid-cols-4 gap-3">
                 <input type="text" id="exp-details" placeholder="Description (e.g., Grocery)" required class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 text-sm font-bold">
                 <select id="exp-category" class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 text-sm font-bold">
@@ -119,7 +135,7 @@
                     <option value="Other">📝 Other</option>
                 </select>
                 <input type="number" id="exp-cost" placeholder="Amount (₹)" required class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 text-sm font-bold">
-                <button type="submit" class="bg-emerald-600 text-white font-black p-3 rounded-xl">SAVE</button>
+                <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black p-3 rounded-xl transition-all">SAVE</button>
             </form>
         </div>
 
@@ -132,10 +148,46 @@
     </div>
 </main>
 
+<!-- TEMPLATE EDIT / CREATE MODAL -->
+<div id="template-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white dark:bg-slate-900 w-full max-w-md p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+        <div class="flex justify-between items-center border-b dark:border-slate-800 pb-3">
+            <h3 id="template-modal-title" class="font-black text-lg text-slate-800 dark:text-slate-100">Set Monthly Expense Template</h3>
+            <button onclick="closeTemplateModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <form id="template-form" class="space-y-4" onsubmit="handleTemplateSubmit(event)">
+            <input type="hidden" id="tpl-id">
+            <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Template Name</label>
+                <input type="text" id="tpl-name" placeholder="e.g., House Rent, Car EMI" required class="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 font-bold text-sm text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Monthly Amount (₹)</label>
+                <input type="number" id="tpl-amount" placeholder="e.g., 8000" required class="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 font-bold text-sm text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Category</label>
+                <select id="tpl-category" class="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 font-bold text-sm text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="Bills">💡 Utilities & Rent</option>
+                    <option value="Food">🍔 Food & Dining</option>
+                    <option value="Shopping">🛍️ Shopping</option>
+                    <option value="Travel">🚗 Travel</option>
+                    <option value="Other">📝 Other / EMI</option>
+                </select>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeTemplateModal()" class="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold py-3 rounded-xl text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">Cancel</button>
+                <button type="submit" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl text-sm shadow-md transition-all">Save Template</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
-    const SUPABASE_URL = 'https://xmkiumvkdmtgfiyntgqg.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhta2l1bXZrZG10Z2ZpeW50Z3FnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NDcyNjAsImV4cCI6MjEwMjUyMzI2MH0.toduMHrsZZyUsJq9OnR6r4XSw9thfzakdO46JZKC-8U';
-    const PYTHON_BACKEND_URL = 'https://fe-and-be.onrender.com/api'; 
+    const SUPABASE_URL = 'https://xmkiumvkdmtgfiyntgqg.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhta2l1bXZrZG10Z2ZpeW50Z3FnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NDcyNjAsImV4cCI6MjEwMjUyMzI2MH0.toduMHrsZZyUsJq9OnR6r4XSw9thfzakdO46JZKC-8U';
+    const PYTHON_BACKEND_URL = 'https://fe-and-be.onrender.com/api'; 
+    const BACKEND_URL = PYTHON_BACKEND_URL;
 
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let currentSession = null;
@@ -183,7 +235,7 @@
         const profData = await profRes.json();
         inHandSalary = profData.in_hand_salary || 0;
 
-        // Fetch Recurring
+        // Fetch Recurring Templates
         const recRes = await fetch(`${BACKEND_URL}/recurring`, { headers });
         recurringData = await recRes.json();
 
@@ -206,22 +258,69 @@
         }
     }
 
-    async function addOrEditEMI(id = null, oldName = '', oldAmount = '') {
-        const name = prompt("Enter EMI/Rent Name:", oldName);
-        if (!name) return;
-        const amount = prompt("Enter Monthly Amount (₹):", oldAmount);
-        if (!amount) return;
+    function openTemplateModal(id = null) {
+        const modal = document.getElementById('template-modal');
+        const titleEl = document.getElementById('template-modal-title');
+        const idInput = document.getElementById('tpl-id');
+        const nameInput = document.getElementById('tpl-name');
+        const amountInput = document.getElementById('tpl-amount');
+        const categoryInput = document.getElementById('tpl-category');
+
+        if (id) {
+            const item = recurringData.find(r => String(r.id) === String(id));
+            if (item) {
+                titleEl.innerText = "Edit Expense Template";
+                idInput.value = item.id;
+                nameInput.value = item.name;
+                amountInput.value = item.amount;
+                categoryInput.value = item.category || 'Bills';
+            }
+        } else {
+            titleEl.innerText = "Add Expense Template";
+            idInput.value = "";
+            document.getElementById('template-form').reset();
+        }
+        modal.classList.remove('hidden');
+    }
+
+    function closeTemplateModal() {
+        document.getElementById('template-modal').classList.add('hidden');
+    }
+
+    async function handleTemplateSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById('tpl-id').value;
+        const name = document.getElementById('tpl-name').value;
+        const amount = document.getElementById('tpl-amount').value;
+        const category = document.getElementById('tpl-category').value;
 
         await fetch(`${BACKEND_URL}/recurring`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
-            body: JSON.stringify({ id, name, amount, active: true })
+            body: JSON.stringify({ id: id || null, name, amount, category, active: true })
+        });
+        closeTemplateModal();
+        loadInitialData();
+    }
+
+    async function quickLog(name, amount, category) {
+        const payload = {
+            details: name,
+            category: category || 'Bills',
+            cost: parseFloat(amount),
+            date: new Date().toISOString()
+        };
+
+        await fetch(`${BACKEND_URL}/expenses`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+            body: JSON.stringify(payload)
         });
         loadInitialData();
     }
 
     async function deleteEMI(id) {
-        if(confirm("Delete this recurring item?")) {
+        if(confirm("Delete this recurring template?")) {
             await fetch(`${BACKEND_URL}/recurring/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${currentSession.access_token}` }
@@ -285,36 +384,66 @@
         document.getElementById('stat-variable').innerText = `₹${totalVariable.toLocaleString()}`;
         document.getElementById('balance-display').innerText = `₹${remainingBalance.toLocaleString()}`;
 
+        // Render Quick Templates Chips
+        const quickContainer = document.getElementById('quick-templates-container');
+        const quickList = document.getElementById('quick-templates-list');
+        if (recurringData && recurringData.length > 0) {
+            quickContainer.classList.remove('hidden');
+            quickList.innerHTML = recurringData.map(item => `
+                <button type="button" onclick="quickLog('${item.name.replace(/'/g, "\\'")}', ${item.amount}, '${item.category || 'Bills'}')" 
+                    class="bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold text-xs px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800 flex items-center gap-1.5 transition-all shadow-sm active:scale-95">
+                    <i class="fa-solid fa-bolt text-amber-500"></i> ${item.name} (₹${item.amount.toLocaleString()})
+                </button>
+            `).join('');
+        } else {
+            quickContainer.classList.add('hidden');
+        }
+
         // Render Recurring List
         const recEl = document.getElementById('recurring-list');
-        recEl.innerHTML = recurringData.map(item => `
-            <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-800 p-3 rounded-xl">
-                <div>
-                    <span class="font-bold text-sm">${item.name}</span>
-                    <span class="text-xs text-slate-400 block font-semibold uppercase">${item.category}</span>
+        if (recurringData.length === 0) {
+            recEl.innerHTML = `<p class="text-xs text-slate-400 italic p-2">No templates added yet. Click "+ Add Template" above to set monthly fixed costs like Rent or EMI.</p>`;
+        } else {
+            recEl.innerHTML = recurringData.map(item => `
+                <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-700/50">
+                    <div>
+                        <span class="font-bold text-sm text-slate-800 dark:text-slate-100">${item.name}</span>
+                        <span class="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">${item.category || 'Bills'}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-black text-slate-700 dark:text-slate-200 mr-2 text-sm">₹${item.amount.toLocaleString()}</span>
+                        <button onclick="quickLog('${item.name.replace(/'/g, "\\'")}', ${item.amount}, '${item.category || 'Bills'}')" class="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-sm transition-all" title="1-Click Log into Expenses">
+                            <i class="fa-solid fa-bolt text-amber-300"></i> Log
+                        </button>
+                        <button onclick="openTemplateModal('${item.id}')" class="text-xs text-blue-500 hover:text-blue-600 font-bold p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30" title="Edit Template">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button onclick="deleteEMI('${item.id}')" class="text-xs text-red-500 hover:text-red-600 font-bold p-1.5 rounded-lg bg-red-50 dark:bg-red-900/30" title="Delete Template">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
-                <div class="flex items-center gap-3">
-                    <span class="font-black text-slate-700 dark:text-slate-200">₹${item.amount}</span>
-                    <button onclick="addOrEditEMI('${item.id}', '${item.name}', ${item.amount})" class="text-xs text-blue-500 font-bold"><i class="fa-solid fa-pen"></i></button>
-                    <button onclick="deleteEMI('${item.id}')" class="text-xs text-red-500 font-bold"><i class="fa-solid fa-trash"></i></button>
-                </div>
-            </div>
-        `).join('');
+            `).join('');
+        }
 
         // Render Expense History
         const histEl = document.getElementById('history-list');
-        histEl.innerHTML = filteredExpenses.map(item => `
-            <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-800 p-3 rounded-xl">
-                <div>
-                    <span class="font-bold text-sm">${item.details || item.category}</span>
-                    <span class="text-[10px] text-slate-400 block font-bold uppercase">${new Date(item.date).toLocaleDateString()}</span>
+        if (filteredExpenses.length === 0) {
+            histEl.innerHTML = `<p class="text-xs text-slate-400 italic p-2">No transactions logged for this period.</p>`;
+        } else {
+            histEl.innerHTML = filteredExpenses.map(item => `
+                <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-700/50">
+                    <div>
+                        <span class="font-bold text-sm text-slate-800 dark:text-slate-100">${item.details || item.category}</span>
+                        <span class="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">${new Date(item.date).toLocaleDateString()}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="font-black text-emerald-600 dark:text-emerald-400 text-sm">₹${item.cost.toLocaleString()}</span>
+                        <button onclick="deleteExpense('${item.id}')" class="text-xs text-red-400 hover:text-red-600 p-1.5 rounded-lg bg-red-50 dark:bg-red-900/30"><i class="fa-solid fa-trash"></i></button>
+                    </div>
                 </div>
-                <div class="flex items-center gap-3">
-                    <span class="font-black text-emerald-600">₹${item.cost}</span>
-                    <button onclick="deleteExpense('${item.id}')" class="text-xs text-red-400"><i class="fa-solid fa-trash"></i></button>
-                </div>
-            </div>
-        `).join('');
+            `).join('');
+        }
 
         renderCharts(filteredExpenses);
     }

@@ -59,7 +59,7 @@ def manage_recurring():
             "user_id": user.id,
             "name": data.get("name"),
             "amount": float(data.get("amount", 0)),
-            "category": data.get("category", "emi"),
+            "category": data.get("category", "Bills"),
             "active": data.get("active", True)
         }
         # If ID is provided, update existing
