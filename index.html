@@ -228,36 +228,72 @@
     async function handleLogout() { await supabaseClient.auth.signOut(); }
 
     async function loadInitialData() {
-        if (!currentSession || !currentSession.access_token) return;
-        const headers = { 'Authorization': `Bearer ${currentSession.access_token}` };
+        if (!currentSession || !currentSession.user) return;
+        const userId = currentSession.user.id;
         
         try {
-            // Fetch Salary
-            const profRes = await fetch(`${BACKEND_URL}/profile`, { headers });
-            if (profRes.ok) {
-                const profData = await profRes.json();
-                inHandSalary = parseFloat(profData.in_hand_salary) || 0;
+            // 1. Fetch Salary
+            let salaryVal = 0;
+            const { data: profData, error: profErr } = await supabaseClient
+                .from('user_settings')
+                .select('in_hand_salary')
+                .eq('user_id', userId)
+                .maybeSingle();
+            
+            if (!profErr && profData) {
+                salaryVal = parseFloat(profData.in_hand_salary) || 0;
+            } else if (BACKEND_URL) {
+                const headers = { 'Authorization': `Bearer ${currentSession.access_token}` };
+                const profRes = await fetch(`${BACKEND_URL}/profile`, { headers });
+                if (profRes.ok) {
+                    const pJson = await profRes.json();
+                    salaryVal = parseFloat(pJson.in_hand_salary) || 0;
+                }
             }
+            inHandSalary = salaryVal;
 
-            // Fetch Recurring Templates
-            const recRes = await fetch(`${BACKEND_URL}/recurring`, { headers });
-            if (recRes.ok) {
-                const recData = await recRes.json();
-                recurringData = Array.isArray(recData) ? recData : [];
-            } else {
-                recurringData = [];
-            }
+            // 2. Fetch Recurring Templates
+            let recItems = [];
+            const { data: recData, error: recErr } = await supabaseClient
+                .from('recurring_expenses')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: true });
 
-            // Fetch Expenses
-            const expRes = await fetch(`${BACKEND_URL}/expenses`, { headers });
-            if (expRes.ok) {
-                const expData = await expRes.json();
-                expensesData = Array.isArray(expData) ? expData : [];
-            } else {
-                expensesData = [];
+            if (!recErr && Array.isArray(recData)) {
+                recItems = recData;
+            } else if (BACKEND_URL) {
+                const headers = { 'Authorization': `Bearer ${currentSession.access_token}` };
+                const recRes = await fetch(`${BACKEND_URL}/recurring`, { headers });
+                if (recRes.ok) {
+                    const rJson = await recRes.json();
+                    recItems = Array.isArray(rJson) ? rJson : [];
+                }
             }
+            recurringData = recItems;
+
+            // 3. Fetch Expenses
+            let expItems = [];
+            const { data: expData, error: expErr } = await supabaseClient
+                .from('expenses')
+                .select('*')
+                .eq('user_id', userId)
+                .order('date', { ascending: false });
+
+            if (!expErr && Array.isArray(expData)) {
+                expItems = expData;
+            } else if (BACKEND_URL) {
+                const headers = { 'Authorization': `Bearer ${currentSession.access_token}` };
+                const expRes = await fetch(`${BACKEND_URL}/expenses`, { headers });
+                if (expRes.ok) {
+                    const eJson = await expRes.json();
+                    expItems = Array.isArray(eJson) ? eJson : [];
+                }
+            }
+            expensesData = expItems;
+
         } catch (err) {
-            console.error("Failed to load data:", err);
+            console.error("Error loading data from database:", err);
         }
 
         updateUI();
@@ -268,11 +304,18 @@
         if (newSal !== null && newSal.trim() !== "") {
             const parsedSal = parseFloat(newSal);
             if (!isNaN(parsedSal)) {
-                await fetch(`${BACKEND_URL}/profile`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
-                    body: JSON.stringify({ in_hand_salary: parsedSal })
-                });
+                const userId = currentSession.user.id;
+                const { error } = await supabaseClient
+                    .from('user_settings')
+                    .upsert({ user_id: userId, in_hand_salary: parsedSal }, { onConflict: 'user_id' });
+                
+                if (error && BACKEND_URL) {
+                    await fetch(`${BACKEND_URL}/profile`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+                        body: JSON.stringify({ in_hand_salary: parsedSal })
+                    });
+                }
                 await loadInitialData();
             }
         }
@@ -314,66 +357,116 @@
         const name = document.getElementById('tpl-name').value;
         const amount = parseFloat(document.getElementById('tpl-amount').value) || 0;
         const category = document.getElementById('tpl-category').value;
+        const userId = currentSession.user.id;
 
-        await fetch(`${BACKEND_URL}/recurring`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
-            body: JSON.stringify({ id: id || null, name, amount, category, active: true })
-        });
+        const payload = {
+            user_id: userId,
+            name: name,
+            amount: amount,
+            category: category || 'Bills',
+            active: true
+        };
+
+        if (id) {
+            payload.id = isNaN(id) ? id : parseInt(id);
+        }
+
+        const { error } = await supabaseClient
+            .from('recurring_expenses')
+            .upsert(payload);
+
+        if (error && BACKEND_URL) {
+            await fetch(`${BACKEND_URL}/recurring`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+                body: JSON.stringify({ id: id || null, name, amount, category, active: true })
+            });
+        }
+
         closeTemplateModal();
         await loadInitialData();
     }
 
     async function quickLog(name, amount, category) {
+        const userId = currentSession.user.id;
         const payload = {
+            user_id: userId,
             details: name,
             category: category || 'Bills',
             cost: parseFloat(amount) || 0,
             date: new Date().toISOString()
         };
 
-        await fetch(`${BACKEND_URL}/expenses`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
-            body: JSON.stringify(payload)
-        });
+        const { error } = await supabaseClient
+            .from('expenses')
+            .insert([payload]);
+
+        if (error && BACKEND_URL) {
+            await fetch(`${BACKEND_URL}/expenses`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+                body: JSON.stringify(payload)
+            });
+        }
         await loadInitialData();
     }
 
     async function deleteEMI(id) {
         if(confirm("Delete this recurring template?")) {
-            await fetch(`${BACKEND_URL}/recurring/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${currentSession.access_token}` }
-            });
+            const { error } = await supabaseClient
+                .from('recurring_expenses')
+                .delete()
+                .eq('id', id);
+
+            if (error && BACKEND_URL) {
+                await fetch(`${BACKEND_URL}/recurring/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${currentSession.access_token}` }
+                });
+            }
             await loadInitialData();
         }
     }
 
     document.getElementById('expense-form').onsubmit = async (e) => {
         e.preventDefault();
+        const userId = currentSession.user.id;
         const payload = {
+            user_id: userId,
             details: document.getElementById('exp-details').value,
             category: document.getElementById('exp-category').value,
             cost: parseFloat(document.getElementById('exp-cost').value) || 0,
             date: new Date().toISOString()
         };
 
-        await fetch(`${BACKEND_URL}/expenses`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
-            body: JSON.stringify(payload)
-        });
+        const { error } = await supabaseClient
+            .from('expenses')
+            .insert([payload]);
+
+        if (error && BACKEND_URL) {
+            await fetch(`${BACKEND_URL}/expenses`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+                body: JSON.stringify(payload)
+            });
+        }
         e.target.reset();
         await loadInitialData();
     };
 
     async function deleteExpense(id) {
         if(confirm("Delete expense record?")) {
-            await fetch(`${BACKEND_URL}/expenses/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${currentSession.access_token}` }
-            });
+            const { error } = await supabaseClient
+                .from('expenses')
+                .delete()
+                .eq('id', id);
+
+            if (error && BACKEND_URL) {
+                await fetch(`${BACKEND_URL}/expenses/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${currentSession.access_token}` }
+                });
+            }
             await loadInitialData();
         }
     }
