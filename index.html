@@ -104,7 +104,7 @@
             </div>
         </div>
 
-        <!-- CREDIT CARD STATEMENT CYCLE & UTILIZATION WIDGET (21st to 20th Cycle) -->
+        <!-- CREDIT CARD STATEMENT CYCLE & UTILIZATION WIDGET -->
         <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-3xl border border-indigo-900/60 shadow-xl space-y-3">
             <div class="flex flex-wrap justify-between items-center gap-2">
                 <div class="flex items-center gap-2.5">
@@ -112,27 +112,27 @@
                         <i class="fa-solid fa-credit-card text-lg"></i>
                     </div>
                     <div>
-                        <h4 class="text-xs font-black uppercase tracking-wider text-indigo-300">Credit Card Statement Cycle</h4>
-                        <p class="text-xs text-slate-300 font-medium" id="cc-cycle-period">Cycle: 21st to 20th</p>
+                        <h4 class="text-xs font-black uppercase tracking-wider text-indigo-300">Credit Card Tracker</h4>
+                        <p class="text-xs text-slate-300 font-medium" id="cc-cycle-period">Tracks only CC-tagged expenses</p>
                     </div>
                 </div>
-                <div id="cc-billing-badge" class="px-3 py-1 rounded-xl text-xs font-black bg-indigo-500/20 border border-indigo-400/30 text-indigo-300">
-                    Cycle Active
-                </div>
+                <button onclick="resetCreditCard()" class="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-500/20 border border-rose-400/30 text-rose-300 hover:bg-rose-500/30 transition-all flex items-center gap-1.5" title="Reset after bill payment">
+                    <i class="fa-solid fa-rotate-left"></i> Reset Bill
+                </button>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                 <div class="bg-white/5 p-3 rounded-2xl border border-white/10">
-                    <p class="text-[10px] uppercase font-bold text-slate-400">Current Cycle Debt</p>
+                    <p class="text-[10px] uppercase font-bold text-slate-400">Outstanding CC Spend</p>
                     <p class="text-lg font-black text-rose-400" id="cc-current-bill">₹0</p>
                 </div>
                 <div class="bg-white/5 p-3 rounded-2xl border border-white/10">
-                    <p class="text-[10px] uppercase font-bold text-slate-400">Statement Cut-Off</p>
-                    <p class="text-sm font-bold text-slate-200" id="cc-cutoff-date">20th of Month</p>
+                    <p class="text-[10px] uppercase font-bold text-slate-400">CC Transactions</p>
+                    <p class="text-sm font-bold text-slate-200" id="cc-tx-count">0 items</p>
                 </div>
                 <div class="bg-white/5 p-3 rounded-2xl border border-white/10">
-                    <p class="text-[10px] uppercase font-bold text-slate-400">Credit Deficit Alert</p>
-                    <p class="text-sm font-bold text-amber-300" id="cc-deficit-status">No Cash Deficit</p>
+                    <p class="text-[10px] uppercase font-bold text-slate-400">Status</p>
+                    <p class="text-sm font-bold text-emerald-400" id="cc-deficit-status">No Outstanding Dues</p>
                 </div>
             </div>
         </div>
@@ -190,17 +190,33 @@
                 <div id="quick-templates-list" class="flex flex-wrap gap-2"></div>
             </div>
 
-            <form id="expense-form" class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                <input type="text" id="exp-details" placeholder="Description (e.g., Grocery)" required class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 text-sm font-bold">
-                <select id="exp-category" class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 text-sm font-bold">
-                    <option value="Food">🍔 Food & Dining</option>
-                    <option value="Shopping">🛍️ Shopping</option>
-                    <option value="Travel">🚗 Travel</option>
-                    <option value="Bills">💡 Utilities</option>
-                    <option value="Other">📝 Other</option>
-                </select>
-                <input type="number" id="exp-cost" placeholder="Amount (₹)" required class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 text-sm font-bold">
-                <button type="submit" class="theme-btn bg-emerald-600 hover:opacity-90 text-white font-black p-3 rounded-xl transition-all">SAVE</button>
+            <form id="expense-form" class="space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <input type="text" id="exp-details" placeholder="Description (e.g., Grocery)" required class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 text-sm font-bold">
+                    <select id="exp-category" class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 text-sm font-bold">
+                        <option value="Food">🍔 Food & Dining</option>
+                        <option value="Shopping">🛍️ Shopping</option>
+                        <option value="Travel">🚗 Travel</option>
+                        <option value="Bills">💡 Utilities</option>
+                        <option value="Other">📝 Other</option>
+                    </select>
+                    <input type="number" id="exp-cost" placeholder="Amount (₹)" required class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 text-sm font-bold">
+                </div>
+                <!-- PAYMENT SOURCE TOGGLE -->
+                <div class="flex items-center gap-3">
+                    <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Paid from:</span>
+                    <div class="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 gap-1 text-xs font-bold">
+                        <button type="button" id="src-inhand-btn" onclick="setPaymentSource('inhand')" class="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm transition-all flex items-center gap-1">
+                            <i class="fa-solid fa-wallet"></i> In-Hand Cash
+                        </button>
+                        <button type="button" id="src-credit-btn" onclick="setPaymentSource('credit')" class="px-3 py-1.5 rounded-lg text-slate-500 dark:text-slate-400 transition-all flex items-center gap-1">
+                            <i class="fa-solid fa-credit-card"></i> Credit Card
+                        </button>
+                    </div>
+                    <input type="hidden" id="exp-payment-source" value="inhand">
+                    <span id="payment-source-hint" class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">Deducted from In-Hand</span>
+                </div>
+                <button type="submit" class="theme-btn w-full sm:w-auto bg-emerald-600 hover:opacity-90 text-white font-black px-6 py-3 rounded-xl transition-all">SAVE EXPENSE</button>
             </form>
         </div>
 
@@ -650,7 +666,8 @@
             details: name,
             category: category || 'Bills',
             cost: parseFloat(amount) || 0,
-            date: new Date().toISOString()
+            date: new Date().toISOString(),
+            payment_source: 'inhand'  // templates always come from in-hand
         };
 
         const { error } = await supabaseClient
@@ -715,15 +732,45 @@
         }
     }
 
+    function setPaymentSource(source) {
+        document.getElementById('exp-payment-source').value = source;
+        const inhandBtn = document.getElementById('src-inhand-btn');
+        const creditBtn = document.getElementById('src-credit-btn');
+        const hint = document.getElementById('payment-source-hint');
+        if (source === 'inhand') {
+            inhandBtn.className = "px-3 py-1.5 rounded-lg bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm transition-all flex items-center gap-1";
+            creditBtn.className = "px-3 py-1.5 rounded-lg text-slate-500 dark:text-slate-400 transition-all flex items-center gap-1";
+            hint.innerText = "Deducted from In-Hand";
+            hint.className = "text-[11px] text-emerald-600 dark:text-emerald-400 font-bold";
+        } else {
+            creditBtn.className = "px-3 py-1.5 rounded-lg bg-white dark:bg-indigo-900/50 text-indigo-400 shadow-sm transition-all flex items-center gap-1";
+            inhandBtn.className = "px-3 py-1.5 rounded-lg text-slate-500 dark:text-slate-400 transition-all flex items-center gap-1";
+            hint.innerText = "Added to CC Outstanding";
+            hint.className = "text-[11px] text-rose-500 dark:text-rose-400 font-bold";
+        }
+    }
+
+    function resetCreditCard() {
+        if (confirm("Reset Credit Card outstanding balance to ₹0? Do this after you've paid the bill.")) {
+            const now = new Date();
+            const resetKey = `cc_reset_${now.getFullYear()}_${now.getMonth()}_${now.getDate()}_${now.getTime()}`;
+            localStorage.setItem('cc_reset_timestamp', Date.now().toString());
+            updateUI();
+            alert("Credit Card balance reset. Expenses before this point won't count.");
+        }
+    }
+
     document.getElementById('expense-form').onsubmit = async (e) => {
         e.preventDefault();
         const userId = currentSession.user.id;
+        const paymentSource = document.getElementById('exp-payment-source').value || 'inhand';
         const payload = {
             user_id: userId,
             details: document.getElementById('exp-details').value,
             category: document.getElementById('exp-category').value,
             cost: parseFloat(document.getElementById('exp-cost').value) || 0,
-            date: new Date().toISOString()
+            date: new Date().toISOString(),
+            payment_source: paymentSource
         };
 
         const { error } = await supabaseClient
@@ -738,6 +785,7 @@
             });
         }
         e.target.reset();
+        setPaymentSource('inhand'); // reset to inhand after submit
         await loadInitialData();
     };
 
@@ -816,60 +864,52 @@
             return det.includes(searchQuery) || cat.includes(searchQuery);
         });
 
-        // Compute Totals
+        // Split expenses by payment source
+        const inhandExpenses = scopeExpenses.filter(item => !item.payment_source || item.payment_source === 'inhand');
+        const ccExpenses = scopeExpenses.filter(item => item.payment_source === 'credit');
+
+        // Compute Totals — only inhand spending deducts from cash balance
         const totalFixedTemplates = recList.reduce((acc, cur) => acc + (cur.active !== false ? (parseFloat(cur.amount) || 0) : 0), 0);
+        const totalInhandSpent = inhandExpenses.reduce((acc, cur) => acc + (parseFloat(cur.cost) || 0), 0);
         const totalSpent = scopeExpenses.reduce((acc, cur) => acc + (parseFloat(cur.cost) || 0), 0);
         const numSalary = parseFloat(inHandSalary) || 0;
-        const remainingBalance = numSalary - totalSpent;
+        const remainingBalance = numSalary - totalInhandSpent; // only inhand expenses reduce cash
 
         document.getElementById('stat-salary').innerText = `₹${numSalary.toLocaleString()}`;
         document.getElementById('stat-fixed').innerText = `₹${totalFixedTemplates.toLocaleString()}`;
-        document.getElementById('stat-variable').innerText = `₹${totalSpent.toLocaleString()}`;
+        document.getElementById('stat-variable').innerText = `₹${totalInhandSpent.toLocaleString()}`;
         document.getElementById('balance-display').innerText = `₹${remainingBalance.toLocaleString()}`;
 
-        // Compute Credit Card 21st-to-20th Statement Cycle Debt
-        // Determine active statement cycle bounds (from 21st of prev month to 20th of current/next month)
-        let cycleStart = new Date(now.getFullYear(), now.getMonth(), 21);
-        let cycleEnd = new Date(now.getFullYear(), now.getMonth() + 1, 20, 23, 59, 59);
-
-        if (now.getDate() <= 20) {
-            cycleStart = new Date(now.getFullYear(), now.getMonth() - 1, 21);
-            cycleEnd = new Date(now.getFullYear(), now.getMonth(), 20, 23, 59, 59);
-        }
-
-        const currentCycleExpenses = expList.filter(item => {
-            if (!item || !item.date) return false;
-            const d = new Date(item.date);
-            return d >= cycleStart && d <= cycleEnd;
+        // Compute Credit Card outstanding (CC-tagged expenses after last reset)
+        const ccResetTimestamp = parseInt(localStorage.getItem('cc_reset_timestamp') || '0');
+        const allCCExpenses = expList.filter(item => {
+            if (item.payment_source !== 'credit') return false;
+            if (!item.date) return false;
+            return new Date(item.date).getTime() > ccResetTimestamp;
         });
-
-        const currentCycleDebt = currentCycleExpenses.reduce((acc, cur) => acc + (parseFloat(cur.cost) || 0), 0);
-
-        const cyclePeriodEl = document.getElementById('cc-cycle-period');
-        if (cyclePeriodEl) {
-            const startStr = cycleStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            const endStr = cycleEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            cyclePeriodEl.innerText = `Cycle: ${startStr} – ${endStr}`;
-        }
+        const ccOutstanding = allCCExpenses.reduce((acc, cur) => acc + (parseFloat(cur.cost) || 0), 0);
 
         const ccBillEl = document.getElementById('cc-current-bill');
-        if (ccBillEl) ccBillEl.innerText = `₹${currentCycleDebt.toLocaleString()}`;
+        if (ccBillEl) ccBillEl.innerText = `₹${ccOutstanding.toLocaleString()}`;
+
+        const ccTxEl = document.getElementById('cc-tx-count');
+        if (ccTxEl) ccTxEl.innerText = `${allCCExpenses.length} item${allCCExpenses.length !== 1 ? 's' : ''}`;
 
         const deficitEl = document.getElementById('cc-deficit-status');
         if (deficitEl) {
-            if (remainingBalance < 0) {
-                deficitEl.innerText = `⚠️ Deficit: ₹${Math.abs(remainingBalance).toLocaleString()} on CC`;
-                deficitEl.className = "text-sm font-bold text-red-400";
+            if (ccOutstanding > 0) {
+                deficitEl.innerText = `⚠️ ₹${ccOutstanding.toLocaleString()} unpaid`;
+                deficitEl.className = "text-sm font-bold text-rose-400";
             } else {
-                deficitEl.innerText = "No Cash Deficit";
+                deficitEl.innerText = "No Outstanding Dues";
                 deficitEl.className = "text-sm font-bold text-emerald-400";
             }
         }
 
-        // Compute Savings Rate & Health Badge
-        const savedAmount = Math.max(0, numSalary - totalSpent);
+        // Compute Savings Rate & Health Badge — use only inhand spending (CC is separate)
+        const savedAmount = Math.max(0, numSalary - totalInhandSpent);
         const savingsRate = numSalary > 0 ? Math.round((savedAmount / numSalary) * 100) : 0;
-        const spentPercent = numSalary > 0 ? Math.min(100, Math.round((totalSpent / numSalary) * 100)) : 0;
+        const spentPercent = numSalary > 0 ? Math.min(100, Math.round((totalInhandSpent / numSalary) * 100)) : 0;
 
         const rateEl = document.getElementById('savings-rate-text');
         if (rateEl) rateEl.innerText = `Savings Rate: ${savingsRate}%`;
@@ -1009,18 +1049,25 @@
         if (displayExpenses.length === 0) {
             histEl.innerHTML = `<p class="text-xs text-slate-400 italic p-2">${searchQuery ? 'No matching expenses found.' : 'No transactions logged for this period.'}</p>`;
         } else {
-            histEl.innerHTML = displayExpenses.map(item => `
-                <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-700/50">
+            histEl.innerHTML = displayExpenses.map(item => {
+                const isCC = item.payment_source === 'credit';
+                const costColor = isCC ? 'text-indigo-500 dark:text-indigo-400' : 'text-emerald-600 dark:text-emerald-400';
+                const ccBadge = isCC ? `<span class="text-[9px] font-extrabold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-300 px-1.5 py-0.5 rounded uppercase"><i class="fa-solid fa-credit-card mr-0.5"></i>CC</span>` : `<span class="text-[9px] font-extrabold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-300 px-1.5 py-0.5 rounded uppercase"><i class="fa-solid fa-wallet mr-0.5"></i>Cash</span>`;
+                return `
+                <div class="flex justify-between items-center ${isCC ? 'bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40' : 'bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700/50'} p-3.5 rounded-2xl">
                     <div>
-                        <span class="font-bold text-sm text-slate-800 dark:text-slate-100">${item.details || item.category}</span>
-                        <span class="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">${new Date(item.date).toLocaleDateString()}</span>
+                        <div class="flex items-center gap-2 mb-0.5">
+                            <span class="font-bold text-sm text-slate-800 dark:text-slate-100">${item.details || item.category}</span>
+                            ${ccBadge}
+                        </div>
+                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">${new Date(item.date).toLocaleDateString()}</span>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span class="font-black text-emerald-600 dark:text-emerald-400 text-sm">₹${(parseFloat(item.cost) || 0).toLocaleString()}</span>
+                        <span class="font-black ${costColor} text-sm">₹${(parseFloat(item.cost) || 0).toLocaleString()}</span>
                         <button onclick="deleteExpense('${item.id}')" class="text-xs text-red-400 hover:text-red-600 p-1.5 rounded-lg bg-red-50 dark:bg-red-900/30"><i class="fa-solid fa-trash"></i></button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
 
         renderCharts(scopeExpenses);
