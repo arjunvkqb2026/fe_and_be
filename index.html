@@ -228,33 +228,53 @@
     async function handleLogout() { await supabaseClient.auth.signOut(); }
 
     async function loadInitialData() {
+        if (!currentSession || !currentSession.access_token) return;
         const headers = { 'Authorization': `Bearer ${currentSession.access_token}` };
         
-        // Fetch Salary
-        const profRes = await fetch(`${BACKEND_URL}/profile`, { headers });
-        const profData = await profRes.json();
-        inHandSalary = profData.in_hand_salary || 0;
+        try {
+            // Fetch Salary
+            const profRes = await fetch(`${BACKEND_URL}/profile`, { headers });
+            if (profRes.ok) {
+                const profData = await profRes.json();
+                inHandSalary = parseFloat(profData.in_hand_salary) || 0;
+            }
 
-        // Fetch Recurring Templates
-        const recRes = await fetch(`${BACKEND_URL}/recurring`, { headers });
-        recurringData = await recRes.json();
+            // Fetch Recurring Templates
+            const recRes = await fetch(`${BACKEND_URL}/recurring`, { headers });
+            if (recRes.ok) {
+                const recData = await recRes.json();
+                recurringData = Array.isArray(recData) ? recData : [];
+            } else {
+                recurringData = [];
+            }
 
-        // Fetch Expenses
-        const expRes = await fetch(`${BACKEND_URL}/expenses`, { headers });
-        expensesData = await expRes.json();
+            // Fetch Expenses
+            const expRes = await fetch(`${BACKEND_URL}/expenses`, { headers });
+            if (expRes.ok) {
+                const expData = await expRes.json();
+                expensesData = Array.isArray(expData) ? expData : [];
+            } else {
+                expensesData = [];
+            }
+        } catch (err) {
+            console.error("Failed to load data:", err);
+        }
 
         updateUI();
     }
 
     async function updateSalaryPrompt() {
         const newSal = prompt("Enter your monthly total in-hand salary (₹):", inHandSalary);
-        if (newSal !== null) {
-            await fetch(`${BACKEND_URL}/profile`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
-                body: JSON.stringify({ in_hand_salary: newSal })
-            });
-            loadInitialData();
+        if (newSal !== null && newSal.trim() !== "") {
+            const parsedSal = parseFloat(newSal);
+            if (!isNaN(parsedSal)) {
+                await fetch(`${BACKEND_URL}/profile`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+                    body: JSON.stringify({ in_hand_salary: parsedSal })
+                });
+                await loadInitialData();
+            }
         }
     }
 
@@ -267,7 +287,8 @@
         const categoryInput = document.getElementById('tpl-category');
 
         if (id) {
-            const item = recurringData.find(r => String(r.id) === String(id));
+            const recList = Array.isArray(recurringData) ? recurringData : [];
+            const item = recList.find(r => String(r.id) === String(id));
             if (item) {
                 titleEl.innerText = "Edit Expense Template";
                 idInput.value = item.id;
@@ -291,7 +312,7 @@
         e.preventDefault();
         const id = document.getElementById('tpl-id').value;
         const name = document.getElementById('tpl-name').value;
-        const amount = document.getElementById('tpl-amount').value;
+        const amount = parseFloat(document.getElementById('tpl-amount').value) || 0;
         const category = document.getElementById('tpl-category').value;
 
         await fetch(`${BACKEND_URL}/recurring`, {
@@ -300,14 +321,14 @@
             body: JSON.stringify({ id: id || null, name, amount, category, active: true })
         });
         closeTemplateModal();
-        loadInitialData();
+        await loadInitialData();
     }
 
     async function quickLog(name, amount, category) {
         const payload = {
             details: name,
             category: category || 'Bills',
-            cost: parseFloat(amount),
+            cost: parseFloat(amount) || 0,
             date: new Date().toISOString()
         };
 
@@ -316,7 +337,7 @@
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
             body: JSON.stringify(payload)
         });
-        loadInitialData();
+        await loadInitialData();
     }
 
     async function deleteEMI(id) {
@@ -325,7 +346,7 @@
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${currentSession.access_token}` }
             });
-            loadInitialData();
+            await loadInitialData();
         }
     }
 
@@ -334,7 +355,7 @@
         const payload = {
             details: document.getElementById('exp-details').value,
             category: document.getElementById('exp-category').value,
-            cost: document.getElementById('exp-cost').value,
+            cost: parseFloat(document.getElementById('exp-cost').value) || 0,
             date: new Date().toISOString()
         };
 
@@ -344,7 +365,7 @@
             body: JSON.stringify(payload)
         });
         e.target.reset();
-        loadInitialData();
+        await loadInitialData();
     };
 
     async function deleteExpense(id) {
@@ -353,7 +374,7 @@
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${currentSession.access_token}` }
             });
-            loadInitialData();
+            await loadInitialData();
         }
     }
 
@@ -361,9 +382,14 @@
         const filter = document.getElementById('time-filter').value;
         const now = new Date();
 
+        const recList = Array.isArray(recurringData) ? recurringData : [];
+        const expList = Array.isArray(expensesData) ? expensesData : [];
+
         // Filter Variable Expenses based on Week, Month, Year
-        const filteredExpenses = expensesData.filter(item => {
+        const filteredExpenses = expList.filter(item => {
+            if (!item || !item.date) return false;
             const itemDate = new Date(item.date);
+            if (isNaN(itemDate.getTime())) return false;
             if (filter === 'week') {
                 const diffTime = Math.abs(now - itemDate);
                 return diffTime / (1000 * 60 * 60 * 24) <= 7;
@@ -372,14 +398,16 @@
             } else if (filter === 'year') {
                 return itemDate.getFullYear() === now.getFullYear();
             }
+            return true;
         });
 
-        // Compute Totals
-        const totalFixed = recurringData.reduce((acc, cur) => acc + (cur.active ? cur.amount : 0), 0);
-        const totalVariable = filteredExpenses.reduce((acc, cur) => acc + cur.cost, 0);
-        const remainingBalance = inHandSalary - (totalFixed + totalVariable);
+        // Compute Totals with explicit parseFloat / Number conversion
+        const totalFixed = recList.reduce((acc, cur) => acc + (cur.active !== false ? (parseFloat(cur.amount) || 0) : 0), 0);
+        const totalVariable = filteredExpenses.reduce((acc, cur) => acc + (parseFloat(cur.cost) || 0), 0);
+        const numSalary = parseFloat(inHandSalary) || 0;
+        const remainingBalance = numSalary - (totalFixed + totalVariable);
 
-        document.getElementById('stat-salary').innerText = `₹${inHandSalary.toLocaleString()}`;
+        document.getElementById('stat-salary').innerText = `₹${numSalary.toLocaleString()}`;
         document.getElementById('stat-fixed').innerText = `₹${totalFixed.toLocaleString()}`;
         document.getElementById('stat-variable').innerText = `₹${totalVariable.toLocaleString()}`;
         document.getElementById('balance-display').innerText = `₹${remainingBalance.toLocaleString()}`;
@@ -387,12 +415,12 @@
         // Render Quick Templates Chips
         const quickContainer = document.getElementById('quick-templates-container');
         const quickList = document.getElementById('quick-templates-list');
-        if (recurringData && recurringData.length > 0) {
+        if (recList.length > 0) {
             quickContainer.classList.remove('hidden');
-            quickList.innerHTML = recurringData.map(item => `
-                <button type="button" onclick="quickLog('${item.name.replace(/'/g, "\\'")}', ${item.amount}, '${item.category || 'Bills'}')" 
+            quickList.innerHTML = recList.map(item => `
+                <button type="button" onclick="quickLog('${(item.name || '').replace(/'/g, "\\'")}', ${parseFloat(item.amount) || 0}, '${item.category || 'Bills'}')" 
                     class="bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold text-xs px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800 flex items-center gap-1.5 transition-all shadow-sm active:scale-95">
-                    <i class="fa-solid fa-bolt text-amber-500"></i> ${item.name} (₹${item.amount.toLocaleString()})
+                    <i class="fa-solid fa-bolt text-amber-500"></i> ${item.name} (₹${(parseFloat(item.amount) || 0).toLocaleString()})
                 </button>
             `).join('');
         } else {
@@ -401,18 +429,18 @@
 
         // Render Recurring List
         const recEl = document.getElementById('recurring-list');
-        if (recurringData.length === 0) {
+        if (recList.length === 0) {
             recEl.innerHTML = `<p class="text-xs text-slate-400 italic p-2">No templates added yet. Click "+ Add Template" above to set monthly fixed costs like Rent or EMI.</p>`;
         } else {
-            recEl.innerHTML = recurringData.map(item => `
+            recEl.innerHTML = recList.map(item => `
                 <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-700/50">
                     <div>
                         <span class="font-bold text-sm text-slate-800 dark:text-slate-100">${item.name}</span>
                         <span class="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">${item.category || 'Bills'}</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <span class="font-black text-slate-700 dark:text-slate-200 mr-2 text-sm">₹${item.amount.toLocaleString()}</span>
-                        <button onclick="quickLog('${item.name.replace(/'/g, "\\'")}', ${item.amount}, '${item.category || 'Bills'}')" class="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-sm transition-all" title="1-Click Log into Expenses">
+                        <span class="font-black text-slate-700 dark:text-slate-200 mr-2 text-sm">₹${(parseFloat(item.amount) || 0).toLocaleString()}</span>
+                        <button onclick="quickLog('${(item.name || '').replace(/'/g, "\\'")}', ${parseFloat(item.amount) || 0}, '${item.category || 'Bills'}')" class="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-sm transition-all" title="1-Click Log into Expenses">
                             <i class="fa-solid fa-bolt text-amber-300"></i> Log
                         </button>
                         <button onclick="openTemplateModal('${item.id}')" class="text-xs text-blue-500 hover:text-blue-600 font-bold p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30" title="Edit Template">
@@ -438,7 +466,7 @@
                         <span class="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">${new Date(item.date).toLocaleDateString()}</span>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span class="font-black text-emerald-600 dark:text-emerald-400 text-sm">₹${item.cost.toLocaleString()}</span>
+                        <span class="font-black text-emerald-600 dark:text-emerald-400 text-sm">₹${(parseFloat(item.cost) || 0).toLocaleString()}</span>
                         <button onclick="deleteExpense('${item.id}')" class="text-xs text-red-400 hover:text-red-600 p-1.5 rounded-lg bg-red-50 dark:bg-red-900/30"><i class="fa-solid fa-trash"></i></button>
                     </div>
                 </div>
@@ -450,7 +478,10 @@
 
     function renderCharts(expenses) {
         const catMap = {};
-        expenses.forEach(e => catMap[e.category] = (catMap[e.category] || 0) + e.cost);
+        expenses.forEach(e => {
+            const costVal = parseFloat(e.cost) || 0;
+            catMap[e.category] = (catMap[e.category] || 0) + costVal;
+        });
 
         if(categoryChart) categoryChart.destroy();
         categoryChart = new Chart(document.getElementById('categoryChart'), {
@@ -465,7 +496,8 @@
         const timeMap = {};
         expenses.forEach(e => {
             const d = new Date(e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            timeMap[d] = (timeMap[d] || 0) + e.cost;
+            const costVal = parseFloat(e.cost) || 0;
+            timeMap[d] = (timeMap[d] || 0) + costVal;
         });
 
         if(timelineChart) timelineChart.destroy();
