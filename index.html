@@ -175,6 +175,10 @@
                     <option value="Other">📝 Other / EMI</option>
                 </select>
             </div>
+            <div id="tpl-log-now-container" class="flex items-center gap-2 pt-1">
+                <input type="checkbox" id="tpl-auto-log" checked class="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer">
+                <label for="tpl-auto-log" class="text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer">Log as transaction for this month now</label>
+            </div>
             <div class="flex gap-3 pt-2">
                 <button type="button" onclick="closeTemplateModal()" class="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold py-3 rounded-xl text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">Cancel</button>
                 <button type="submit" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl text-sm shadow-md transition-all">Save Template</button>
@@ -328,6 +332,8 @@
         const nameInput = document.getElementById('tpl-name');
         const amountInput = document.getElementById('tpl-amount');
         const categoryInput = document.getElementById('tpl-category');
+        const autoLogContainer = document.getElementById('tpl-log-now-container');
+        const autoLogCheck = document.getElementById('tpl-auto-log');
 
         if (id) {
             const recList = Array.isArray(recurringData) ? recurringData : [];
@@ -339,10 +345,13 @@
                 amountInput.value = item.amount;
                 categoryInput.value = item.category || 'Bills';
             }
+            if (autoLogContainer) autoLogContainer.classList.add('hidden');
         } else {
             titleEl.innerText = "Add Expense Template";
             idInput.value = "";
             document.getElementById('template-form').reset();
+            if (autoLogContainer) autoLogContainer.classList.remove('hidden');
+            if (autoLogCheck) autoLogCheck.checked = true;
         }
         modal.classList.remove('hidden');
     }
@@ -357,6 +366,7 @@
         const name = document.getElementById('tpl-name').value;
         const amount = parseFloat(document.getElementById('tpl-amount').value) || 0;
         const category = document.getElementById('tpl-category').value;
+        const autoLog = document.getElementById('tpl-auto-log') ? document.getElementById('tpl-auto-log').checked : false;
         const userId = currentSession.user.id;
 
         const payload = {
@@ -383,8 +393,14 @@
             });
         }
 
+        // If newly created and autoLog is checked, log it into expenses (Transaction History)
+        if (!id && autoLog) {
+            await quickLog(name, amount, category);
+        } else {
+            await loadInitialData();
+        }
+
         closeTemplateModal();
-        await loadInitialData();
     }
 
     async function quickLog(name, amount, category) {
@@ -494,15 +510,15 @@
             return true;
         });
 
-        // Compute Totals with explicit parseFloat / Number conversion
-        const totalFixed = recList.reduce((acc, cur) => acc + (cur.active !== false ? (parseFloat(cur.amount) || 0) : 0), 0);
-        const totalVariable = filteredExpenses.reduce((acc, cur) => acc + (parseFloat(cur.cost) || 0), 0);
+        // Compute Totals
+        const totalFixedTemplates = recList.reduce((acc, cur) => acc + (cur.active !== false ? (parseFloat(cur.amount) || 0) : 0), 0);
+        const totalSpent = filteredExpenses.reduce((acc, cur) => acc + (parseFloat(cur.cost) || 0), 0);
         const numSalary = parseFloat(inHandSalary) || 0;
-        const remainingBalance = numSalary - (totalFixed + totalVariable);
+        const remainingBalance = numSalary - totalSpent;
 
         document.getElementById('stat-salary').innerText = `₹${numSalary.toLocaleString()}`;
-        document.getElementById('stat-fixed').innerText = `₹${totalFixed.toLocaleString()}`;
-        document.getElementById('stat-variable').innerText = `₹${totalVariable.toLocaleString()}`;
+        document.getElementById('stat-fixed').innerText = `₹${totalFixedTemplates.toLocaleString()}`;
+        document.getElementById('stat-variable').innerText = `₹${totalSpent.toLocaleString()}`;
         document.getElementById('balance-display').innerText = `₹${remainingBalance.toLocaleString()}`;
 
         // Render Quick Templates Chips
@@ -570,38 +586,80 @@
     }
 
     function renderCharts(expenses) {
+        // Doughnut Category Chart
         const catMap = {};
         expenses.forEach(e => {
             const costVal = parseFloat(e.cost) || 0;
             catMap[e.category] = (catMap[e.category] || 0) + costVal;
         });
 
-        if(categoryChart) categoryChart.destroy();
-        categoryChart = new Chart(document.getElementById('categoryChart'), {
-            type: 'doughnut',
-            data: {
-                labels: Object.keys(catMap),
-                datasets: [{ data: Object.values(catMap), backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'] }]
-            },
-            options: { maintainAspectRatio: false }
-        });
+        if (categoryChart) {
+            categoryChart.destroy();
+            categoryChart = null;
+        }
+        const catCtx = document.getElementById('categoryChart');
+        if (catCtx) {
+            categoryChart = new Chart(catCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(catMap),
+                    datasets: [{
+                        data: Object.values(catMap),
+                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
 
+        // Chronologically sort expenses for the Spending Trend line chart
+        const sortedExpenses = [...expenses].sort((a, b) => new Date(a.date) - new Date(b.date));
         const timeMap = {};
-        expenses.forEach(e => {
+        sortedExpenses.forEach(e => {
             const d = new Date(e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             const costVal = parseFloat(e.cost) || 0;
             timeMap[d] = (timeMap[d] || 0) + costVal;
         });
 
-        if(timelineChart) timelineChart.destroy();
-        timelineChart = new Chart(document.getElementById('timelineChart'), {
-            type: 'line',
-            data: {
-                labels: Object.keys(timeMap),
-                datasets: [{ label: 'Spent', data: Object.values(timeMap), borderColor: '#10b981', fill: false }]
-            },
-            options: { maintainAspectRatio: false }
-        });
+        if (timelineChart) {
+            timelineChart.destroy();
+            timelineChart = null;
+        }
+        const timelineCtx = document.getElementById('timelineChart');
+        if (timelineCtx) {
+            const datesArr = Object.keys(timeMap);
+            const valuesArr = Object.values(timeMap);
+
+            timelineChart = new Chart(timelineCtx, {
+                type: 'line',
+                data: {
+                    labels: datesArr.length > 0 ? datesArr : ['No Transactions'],
+                    datasets: [{
+                        label: 'Daily Spent (₹)',
+                        data: valuesArr.length > 0 ? valuesArr : [0],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: '#10b981',
+                        pointBorderColor: '#10b981',
+                        pointRadius: 4,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(150, 150, 150, 0.1)' } },
+                        x: { grid: { display: false } }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
     }
 </script>
 </body>
